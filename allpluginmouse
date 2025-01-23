@@ -1,0 +1,90 @@
+# Load the necessary assembly for Windows Forms and Drawing
+Add-Type -AssemblyName "System.Windows.Forms"
+Add-Type -AssemblyName "System.Drawing"
+
+# Create the GUI window with "Mouse Detected" message
+$form = New-Object System.Windows.Forms.Form
+$form.Text = ""  # No title
+$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None  # Remove border
+$form.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+$form.BackColor = [System.Drawing.Color]::Black
+$form.TopMost = $true  # Keep the form on top
+
+# Create the label with initial text
+$label = New-Object System.Windows.Forms.Label
+$label.ForeColor = [System.Drawing.Color]::White
+$label.Font = New-Object System.Drawing.Font("Arial", 16, [System.Drawing.FontStyle]::Bold)
+$label.Dock = [System.Windows.Forms.DockStyle]::Fill
+$label.TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+
+# Add the label to the form
+$form.Controls.Add($label)
+
+# Function to check if a mouse is connected
+function Is-MouseConnected {
+    $mouseDevices = Get-WmiObject -Class Win32_PointingDevice
+    foreach ($device in $mouseDevices) {
+        # Check if the device is functional
+        if ($device.Status -eq "OK") {
+            return $true
+        }
+    }
+    return $false
+}
+
+# Function to update the label text based on mouse connection status
+function Update-MouseStatus {
+    if (Is-MouseConnected) {
+        # If mouse is connected, set the background color to black and show "FREE PLAY"
+        $form.Size = New-Object System.Drawing.Size(200, 50)  # Set size of the form
+        $form.Location = New-Object System.Drawing.Point(0, 0)  # Set a default location
+        $form.BackColor = [System.Drawing.Color]::Black
+        $label.Text = "FREE PLAY"
+    } else {
+        # If no mouse is connected, cover the whole screen and show "INSERT COIN"
+        $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+        $form.Size = New-Object System.Drawing.Size($screen.Width, $screen.Height)  # Cover the whole screen
+        $form.Location = New-Object System.Drawing.Point(0, 0)  # Set location to top-left corner
+        $form.BackColor = [System.Drawing.Color]::Black  # Ensure black background
+        $label.Text = "INSERT COIN"
+    }
+}
+
+# Initial update of the label text and background color
+Update-MouseStatus
+
+# Variables to track mouse position for dragging
+$isDragging = $false
+$mouseOffset = New-Object System.Drawing.Point
+
+# MouseDown event to start dragging
+$label.Add_MouseDown({
+    $isDragging = $true
+    $mouseOffset = [System.Windows.Forms.Cursor]::Position - $form.Location
+})
+
+# MouseMove event to move the label
+$label.Add_MouseMove({
+    if ($isDragging) {
+        $form.Location = [System.Windows.Forms.Cursor]::Position - $mouseOffset
+    }
+})
+
+# MouseUp event to stop dragging
+$label.Add_MouseUp({
+    $isDragging = $false
+})
+
+# Timer to check mouse connection every second
+$timer = New-Object System.Windows.Forms.Timer
+$timer.Interval = 1000  # Check every second (1000 milliseconds)
+$timer.Add_Tick({
+    Update-MouseStatus  # Update status whenever the timer ticks
+})
+$timer.Start()
+
+# Show the form
+$form.ShowDialog()
+
+# Stop the timer when the form is closed
+$timer.Stop()
